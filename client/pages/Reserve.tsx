@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Layout from "../components/Layout";
 import ProtectedRoute from "../components/ProtectedRoute";
 
-type PassengerType = "woman" | "pregnant" | "elderly" | "luggage";
+type PassengerType = "woman" | "pregnant" | "elderly" | "luggage" | "regular";
 
 interface PassengerDetails {
   fullName: string;
@@ -27,7 +27,7 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 export default function Reserve() {
   const [step, setStep] = useState(1);
   const [details, setDetails] = useState<PassengerDetails>({ fullName: "", age: "", type: "woman", fromStation: "", toStation: "" });
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [paid, setPaid] = useState(false);
   const routeInvalid = details.fromStation === "" || details.toStation === "" || details.fromStation === details.toStation;
 
@@ -47,7 +47,7 @@ export default function Reserve() {
   }, [details.type, step]);
 
   function isEligible(t: PassengerType) {
-    return ["woman", "pregnant", "elderly", "luggage"].includes(t);
+    return ["woman", "pregnant", "elderly", "luggage", "regular"].includes(t);
   }
 
   function next() {
@@ -55,7 +55,7 @@ export default function Reserve() {
       if (!details.fullName || details.age === "" || Number(details.age) <= 0 || routeInvalid) return;
       setStep(2);
     } else if (step === 2) {
-      if (!selectedSeat) return;
+      if (selectedSeats.length === 0) return;
       setStep(3);
     } else if (step === 3) {
       if (!paid) return;
@@ -65,6 +65,14 @@ export default function Reserve() {
   function prev() {
     setStep((s) => Math.max(1, s - 1));
   }
+
+  function toggleSeat(id: string) {
+    setSelectedSeats((seats) =>
+      seats.includes(id) ? seats.filter((s) => s !== id) : [...seats, id]
+    );
+  }
+
+  const totalFare = 25 * Math.max(1, selectedSeats.length);
 
   return (
     <ProtectedRoute>
@@ -113,6 +121,7 @@ export default function Reserve() {
                       <option value="pregnant">Pregnant woman</option>
                       <option value="elderly">Elderly passenger</option>
                       <option value="luggage">Woman with large luggage</option>
+                      <option value="regular">Regular passenger</option>
                     </select>
                   </div>
                 </div>
@@ -170,11 +179,12 @@ export default function Reserve() {
                   <div key={row} className="grid grid-cols-2 gap-3 items-center">
                     {[0, 1].map((c) => {
                       const id = `${row}${c === 0 ? "A" : "B"}`;
-                      const selected = id === selectedSeat;
+                      const selected = selectedSeats.includes(id);
                       return (
                         <button
                           key={id}
-                          onClick={() => setSelectedSeat(id)}
+                          type="button"
+                          onClick={() => toggleSeat(id)}
                           className={classNames(
                             "h-10 rounded-lg border flex items-center justify-center font-medium",
                             selected ? "bg-purple-600 text-white border-purple-700" : "bg-white text-slate-700 border-slate-200 hover:border-purple-400",
@@ -188,9 +198,10 @@ export default function Reserve() {
                   </div>
                 ))}
               </div>
-              <div className="mt-6 flex justify-between">
+              <div className="mt-6 flex justify-between items-center">
                 <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">Back</button>
-                <button onClick={next} disabled={!selectedSeat} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">Proceed to payment</button>
+                <div className="text-sm text-slate-600">Selected: <span className="font-semibold">{selectedSeats.length}</span></div>
+                <button onClick={next} disabled={selectedSeats.length === 0} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">Proceed to payment</button>
               </div>
             </div>
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6 h-fit">
@@ -199,7 +210,7 @@ export default function Reserve() {
               <p className="text-sm text-slate-600">Type: {prettyType(details.type)}</p>
               <p className="text-sm text-slate-600">From: {details.fromStation || "—"}</p>
               <p className="text-sm text-slate-600">To: {details.toStation || "—"}</p>
-              <p className="text-sm text-slate-600">Seat: {selectedSeat || "—"}</p>
+              <p className="text-sm text-slate-600">Seats: {selectedSeats.length ? selectedSeats.join(", ") : "—"}</p>
             </div>
           </section>
         )}
@@ -208,7 +219,7 @@ export default function Reserve() {
           <section className="mt-8 grid md:grid-cols-2 gap-8">
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6">
               <h2 className="font-semibold mb-4">Payment</h2>
-              <PaymentForm onPaid={() => setPaid(true)} />
+              <PaymentForm onPaid={() => setPaid(true)} amount={totalFare} />
               <div className="mt-6 flex justify-between">
                 <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">Back</button>
                 <button onClick={next} disabled={!paid} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">Get ticket</button>
@@ -222,7 +233,8 @@ export default function Reserve() {
                 <li>Type: {prettyType(details.type)}</li>
                 <li>From: {details.fromStation}</li>
                 <li>Destination: {details.toStation}</li>
-                <li>Seat: {selectedSeat}</li>
+                <li>Seats: {selectedSeats.join(", ")}</li>
+                <li>Total: ₹{totalFare}</li>
               </ul>
             </div>
           </section>
@@ -233,11 +245,11 @@ export default function Reserve() {
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6">
               <h2 className="font-semibold mb-4">Your Ticket</h2>
               <div className="rounded-xl border border-slate-200 p-4 bg-white">
-                <Ticket details={details} seat={selectedSeat!} />
+                <Ticket details={details} seats={selectedSeats} />
               </div>
               <div className="mt-6 flex gap-3">
                 <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700">Print</button>
-                <button onClick={() => { setStep(1); setSelectedSeat(null); setPaid(false); }} className="px-4 py-2 rounded-xl border border-slate-200">Book another</button>
+                <button onClick={() => { setStep(1); setSelectedSeats([]); setPaid(false); }} className="px-4 py-2 rounded-xl border border-slate-200">Book another</button>
               </div>
             </div>
             <InfoCard />
@@ -277,6 +289,8 @@ function prettyType(t: PassengerType) {
       return "Elderly passenger";
     case "luggage":
       return "Woman with large luggage";
+    case "regular":
+      return "Regular passenger";
   }
 }
 
@@ -293,7 +307,7 @@ function InfoCard() {
   );
 }
 
-function PaymentForm({ onPaid }: { onPaid: () => void }) {
+function PaymentForm({ onPaid, amount }: { onPaid: () => void; amount: number }) {
   const [number, setNumber] = useState("");
   const [name, setName] = useState("");
   const [exp, setExp] = useState("");
@@ -319,13 +333,13 @@ function PaymentForm({ onPaid }: { onPaid: () => void }) {
           <input value={cvv} onChange={(e) => setCvv(e.target.value)} placeholder="123" className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500" />
         </div>
       </div>
-      <button onClick={onPaid} disabled={!valid} className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white py-3 font-semibold hover:from-purple-700 hover:to-fuchsia-700 disabled:opacity-60">Pay ₹25</button>
+      <button onClick={onPaid} disabled={!valid} className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white py-3 font-semibold hover:from-purple-700 hover:to-fuchsia-700 disabled:opacity-60">Pay ₹{amount}</button>
       <p className="text-xs text-slate-500">This is a demo payment and will not charge your card.</p>
     </div>
   );
 }
 
-function Ticket({ details, seat }: { details: PassengerDetails; seat: string }) {
+function Ticket({ details, seats }: { details: PassengerDetails; seats: string[] }) {
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
@@ -349,8 +363,8 @@ function Ticket({ details, seat }: { details: PassengerDetails; seat: string }) 
           <div className="font-semibold">{details.fromStation} → {details.toStation}</div>
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
-          <div className="text-slate-500">Seat</div>
-          <div className="font-semibold">{seat}</div>
+          <div className="text-slate-500">Seats</div>
+          <div className="font-semibold">{seats.join(", ")}</div>
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="text-slate-500">Issued</div>
