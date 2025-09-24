@@ -15,10 +15,14 @@ const queryClient = new QueryClient();
 
 function RootRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen grid place-items-center">Loading…</div>;
+  if (loading)
+    return <div className="min-h-screen grid place-items-center">Loading…</div>;
   return (
     <Routes>
-      <Route path="/" element={user ? <Navigate to="/reserve" replace /> : <SignIn />} />
+      <Route
+        path="/"
+        element={user ? <Navigate to="/reserve" replace /> : <SignIn />}
+      />
       <Route path="/reserve" element={<Reserve />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

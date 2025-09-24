@@ -1,4 +1,11 @@
-import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  PropsWithChildren,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
@@ -23,10 +30,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+        setLoading(false);
+      },
+    );
 
     return () => {
       mounted = false;
