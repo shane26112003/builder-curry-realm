@@ -4,12 +4,16 @@ import ProtectedRoute from "../components/ProtectedRoute";
 
 type PassengerType = "woman" | "pregnant" | "elderly" | "luggage" | "regular";
 
-interface PassengerDetails {
+interface Passenger {
   fullName: string;
   age: number | "";
   type: PassengerType;
+}
+
+interface BookingDetails {
   fromStation: string;
   toStation: string;
+  passengers: Passenger[];
 }
 
 interface Seat {
@@ -18,7 +22,25 @@ interface Seat {
   col: 0 | 1; // 0 A, 1 B
 }
 
-const STATIONS = ["Baiyappanahalli", "Swami Vivekananda Road", "Indiranagar", "Halasuru", "Trinity", "MG Road", "Cubbon Park", "Vidhana Soudha", "Sir M Visvesvaraya (Central College)", "Kempegowda (Majestic)", "KSR Railway Station", "Magadi Road", "Vijayanagar", "Attiguppe", "Mysuru Road", "Jayanagar", "Yelachenahalli"];
+const STATIONS = [
+  "Baiyappanahalli",
+  "Swami Vivekananda Road",
+  "Indiranagar",
+  "Halasuru",
+  "Trinity",
+  "MG Road",
+  "Cubbon Park",
+  "Vidhana Soudha",
+  "Sir M Visvesvaraya (Central College)",
+  "Kempegowda (Majestic)",
+  "KSR Railway Station",
+  "Magadi Road",
+  "Vijayanagar",
+  "Attiguppe",
+  "Mysuru Road",
+  "Jayanagar",
+  "Yelachenahalli",
+];
 
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
@@ -26,10 +48,15 @@ function classNames(...xs: Array<string | false | null | undefined>) {
 
 export default function Reserve() {
   const [step, setStep] = useState(1);
-  const [details, setDetails] = useState<PassengerDetails>({ fullName: "", age: "", type: "woman", fromStation: "", toStation: "" });
+  const [details, setDetails] = useState<BookingDetails>({
+    fromStation: "",
+    toStation: "",
+    passengers: [
+      { fullName: "", age: "", type: "woman" },
+    ],
+  });
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [paid, setPaid] = useState(false);
-  const routeInvalid = details.fromStation === "" || details.toStation === "" || details.fromStation === details.toStation;
 
   const seats: Seat[] = useMemo(() => {
     const all: Seat[] = [];
@@ -40,22 +67,34 @@ export default function Reserve() {
     return all;
   }, []);
 
+  const routeInvalid =
+    details.fromStation === "" ||
+    details.toStation === "" ||
+    details.fromStation === details.toStation;
+
   useEffect(() => {
-    if (step === 2 && !isEligible(details.type)) {
+    if (step === 2 && !details.passengers.every((p) => isEligible(p.type))) {
       setStep(1);
     }
-  }, [details.type, step]);
+  }, [details.passengers, step]);
 
   function isEligible(t: PassengerType) {
     return ["woman", "pregnant", "elderly", "luggage", "regular"].includes(t);
   }
 
+  function validatePassengers() {
+    if (details.passengers.length === 0) return false;
+    return details.passengers.every(
+      (p) => p.fullName.trim().length > 0 && p.age !== "" && Number(p.age) > 0 && isEligible(p.type),
+    );
+  }
+
   function next() {
     if (step === 1) {
-      if (!details.fullName || details.age === "" || Number(details.age) <= 0 || routeInvalid) return;
+      if (routeInvalid || !validatePassengers()) return;
       setStep(2);
     } else if (step === 2) {
-      if (selectedSeats.length === 0) return;
+      if (selectedSeats.length !== details.passengers.length) return;
       setStep(3);
     } else if (step === 3) {
       if (!paid) return;
@@ -67,12 +106,16 @@ export default function Reserve() {
   }
 
   function toggleSeat(id: string) {
-    setSelectedSeats((seats) =>
-      seats.includes(id) ? seats.filter((s) => s !== id) : [...seats, id]
-    );
+    setSelectedSeats((seats) => {
+      const isSelected = seats.includes(id);
+      if (isSelected) return seats.filter((s) => s !== id);
+      // cap to number of passengers
+      if (seats.length >= details.passengers.length) return seats;
+      return [...seats, id];
+    });
   }
 
-  const totalFare = 25 * Math.max(1, selectedSeats.length);
+  const totalFare = 25 * Math.max(1, details.passengers.length);
 
   return (
     <ProtectedRoute>
@@ -87,44 +130,8 @@ export default function Reserve() {
         {step === 1 && (
           <section className="mt-8 grid md:grid-cols-2 gap-8">
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4">Passenger details</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">Full name</label>
-                  <input
-                    value={details.fullName}
-                    onChange={(e) => setDetails((d) => ({ ...d, fullName: e.target.value }))}
-                    className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Age</label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={details.age}
-                      onChange={(e) => setDetails((d) => ({ ...d, age: e.target.value === "" ? "" : Number(e.target.value) }))}
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                      placeholder="Age"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700">Passenger type</label>
-                    <select
-                      value={details.type}
-                      onChange={(e) => setDetails((d) => ({ ...d, type: e.target.value as PassengerType }))}
-                      className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    >
-                      <option value="woman">Woman</option>
-                      <option value="pregnant">Pregnant woman</option>
-                      <option value="elderly">Elderly passenger</option>
-                      <option value="luggage">Woman with large luggage</option>
-                      <option value="regular">Regular passenger</option>
-                    </select>
-                  </div>
-                </div>
+              <h2 className="font-semibold mb-4">Trip & passengers</h2>
+              <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700">From</label>
@@ -135,7 +142,9 @@ export default function Reserve() {
                     >
                       <option value="">Select origin</option>
                       {STATIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -148,22 +157,127 @@ export default function Reserve() {
                     >
                       <option value="">Select destination</option>
                       {STATIONS.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
                       ))}
                     </select>
                   </div>
                 </div>
+
                 {routeInvalid && (
                   <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
                     Please select both stations, and ensure they are different.
                   </div>
                 )}
+
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Passengers</h3>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDetails((d) => ({
+                        ...d,
+                        passengers: [...d.passengers, { fullName: "", age: "", type: "regular" }],
+                      }))
+                    }
+                    className="px-3 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700"
+                  >
+                    Add passenger
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {details.passengers.map((p, idx) => (
+                    <div key={idx} className="grid md:grid-cols-5 gap-3 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Full name</label>
+                        <input
+                          value={p.fullName}
+                          onChange={(e) =>
+                            setDetails((d) => {
+                              const passengers = [...d.passengers];
+                              passengers[idx] = { ...passengers[idx], fullName: e.target.value };
+                              return { ...d, passengers };
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Enter full name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Age</label>
+                        <input
+                          type="number"
+                          min={1}
+                          value={p.age}
+                          onChange={(e) =>
+                            setDetails((d) => {
+                              const passengers = [...d.passengers];
+                              passengers[idx] = {
+                                ...passengers[idx],
+                                age: e.target.value === "" ? "" : Number(e.target.value),
+                              };
+                              return { ...d, passengers };
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Age"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Type</label>
+                        <select
+                          value={p.type}
+                          onChange={(e) =>
+                            setDetails((d) => {
+                              const passengers = [...d.passengers];
+                              passengers[idx] = { ...passengers[idx], type: e.target.value as PassengerType };
+                              return { ...d, passengers };
+                            })
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        >
+                          <option value="woman">Woman</option>
+                          <option value="pregnant">Pregnant woman</option>
+                          <option value="elderly">Elderly passenger</option>
+                          <option value="luggage">Woman with large luggage</option>
+                          <option value="regular">Regular passenger</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDetails((d) => ({
+                              ...d,
+                              passengers: d.passengers.filter((_, i) => i !== idx),
+                            }))
+                          }
+                          className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700"
+                          disabled={details.passengers.length === 1}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {!validatePassengers() && (
+                  <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2">
+                    Please fill all passenger details (name, age, type).
+                  </div>
+                )}
+
                 <div className="text-sm text-slate-500">
-                  Note: This coach is reserved for women, pregnant women, elderly passengers, and women carrying large luggage.
+                  Priority for women, pregnant women, elderly passengers, and women carrying large luggage. Regular passengers are also permitted.
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
-                <button onClick={next} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700">Continue</button>
+                <button onClick={next} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700">
+                  Continue
+                </button>
               </div>
             </div>
             <InfoCard />
@@ -173,7 +287,10 @@ export default function Reserve() {
         {step === 2 && (
           <section className="mt-8 grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2 bg-white/80 border border-purple-100 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4">Select your seat</h2>
+              <h2 className="font-semibold mb-4">Select seats</h2>
+              <div className="text-sm text-slate-600 mb-4">
+                Passengers: <span className="font-semibold">{details.passengers.length}</span> • Selected seats: <span className="font-semibold">{selectedSeats.length}</span>
+              </div>
               <div className="grid grid-cols-2 gap-x-10 gap-y-3">
                 {Array.from({ length: 50 }, (_, i) => i + 1).map((row) => (
                   <div key={row} className="grid grid-cols-2 gap-3 items-center">
@@ -187,7 +304,9 @@ export default function Reserve() {
                           onClick={() => toggleSeat(id)}
                           className={classNames(
                             "h-10 rounded-lg border flex items-center justify-center font-medium",
-                            selected ? "bg-purple-600 text-white border-purple-700" : "bg-white text-slate-700 border-slate-200 hover:border-purple-400",
+                            selected
+                              ? "bg-purple-600 text-white border-purple-700"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-purple-400",
                           )}
                           aria-pressed={selected}
                         >
@@ -199,18 +318,34 @@ export default function Reserve() {
                 ))}
               </div>
               <div className="mt-6 flex justify-between items-center">
-                <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">Back</button>
-                <div className="text-sm text-slate-600">Selected: <span className="font-semibold">{selectedSeats.length}</span></div>
-                <button onClick={next} disabled={selectedSeats.length === 0} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">Proceed to payment</button>
+                <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">
+                  Back
+                </button>
+                <div className="text-sm text-slate-600">
+                  Choose exactly {details.passengers.length} seat{details.passengers.length > 1 ? "s" : ""}
+                </div>
+                <button
+                  onClick={next}
+                  disabled={selectedSeats.length !== details.passengers.length}
+                  className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
+                >
+                  Proceed to payment
+                </button>
               </div>
             </div>
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6 h-fit">
               <h3 className="font-semibold">Selection</h3>
-              <p className="text-sm text-slate-600 mt-2">Passenger: {details.fullName || "—"}</p>
-              <p className="text-sm text-slate-600">Type: {prettyType(details.type)}</p>
-              <p className="text-sm text-slate-600">From: {details.fromStation || "—"}</p>
+              <p className="text-sm text-slate-600 mt-2">From: {details.fromStation || "—"}</p>
               <p className="text-sm text-slate-600">To: {details.toStation || "—"}</p>
               <p className="text-sm text-slate-600">Seats: {selectedSeats.length ? selectedSeats.join(", ") : "—"}</p>
+              <div className="mt-4">
+                <h4 className="font-medium text-sm">Passengers</h4>
+                <ul className="text-sm text-slate-600 list-disc pl-5">
+                  {details.passengers.map((p, i) => (
+                    <li key={i}>{p.fullName || "(unnamed)"} • {prettyType(p.type)}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </section>
         )}
@@ -221,18 +356,24 @@ export default function Reserve() {
               <h2 className="font-semibold mb-4">Payment</h2>
               <PaymentForm onPaid={() => setPaid(true)} amount={totalFare} />
               <div className="mt-6 flex justify-between">
-                <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">Back</button>
-                <button onClick={next} disabled={!paid} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60">Get ticket</button>
+                <button onClick={prev} className="px-4 py-2 rounded-xl border border-slate-200">
+                  Back
+                </button>
+                <button
+                  onClick={next}
+                  disabled={!paid}
+                  className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-60"
+                >
+                  Get tickets
+                </button>
               </div>
             </div>
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6 h-fit">
               <h3 className="font-semibold">Summary</h3>
               <ul className="mt-2 text-sm text-slate-600 space-y-1">
-                <li>Name: {details.fullName}</li>
-                <li>Age: {details.age}</li>
-                <li>Type: {prettyType(details.type)}</li>
                 <li>From: {details.fromStation}</li>
                 <li>Destination: {details.toStation}</li>
+                <li>Passengers: {details.passengers.length}</li>
                 <li>Seats: {selectedSeats.join(", ")}</li>
                 <li>Total: ₹{totalFare}</li>
               </ul>
@@ -243,13 +384,28 @@ export default function Reserve() {
         {step === 4 && (
           <section className="mt-8 grid md:grid-cols-2 gap-8">
             <div className="bg-white/80 border border-purple-100 rounded-2xl p-6">
-              <h2 className="font-semibold mb-4">Your Ticket</h2>
-              <div className="rounded-xl border border-slate-200 p-4 bg-white">
-                <Ticket details={details} seats={selectedSeats} />
+              <h2 className="font-semibold mb-4">Your Tickets</h2>
+              <div className="rounded-xl border border-slate-200 p-4 bg-white space-y-4">
+                <Ticket
+                  booking={details}
+                  seats={selectedSeats}
+                />
               </div>
               <div className="mt-6 flex gap-3">
-                <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700">Print</button>
-                <button onClick={() => { setStep(1); setSelectedSeats([]); setPaid(false); }} className="px-4 py-2 rounded-xl border border-slate-200">Book another</button>
+                <button onClick={() => window.print()} className="px-4 py-2 rounded-xl bg-purple-600 text-white hover:bg-purple-700">
+                  Print
+                </button>
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setSelectedSeats([]);
+                    setPaid(false);
+                    setDetails({ fromStation: "", toStation: "", passengers: [{ fullName: "", age: "", type: "woman" }] });
+                  }}
+                  className="px-4 py-2 rounded-xl border border-slate-200"
+                >
+                  Book another
+                </button>
               </div>
             </div>
             <InfoCard />
@@ -261,7 +417,7 @@ export default function Reserve() {
 }
 
 function Stepper({ step }: { step: number }) {
-  const steps = ["Passenger", "Seat", "Payment", "Ticket"];
+  const steps = ["Passengers", "Seat", "Payment", "Ticket"];
   return (
     <ol className="grid grid-cols-4 gap-3">
       {steps.map((label, idx) => {
@@ -269,29 +425,31 @@ function Stepper({ step }: { step: number }) {
         const done = step > s;
         const current = step === s;
         return (
-          <li key={label} className={classNames("flex items-center gap-3 rounded-xl border px-4 py-3", current ? "border-purple-400 bg-purple-50" : done ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white") }>
-            <span className={classNames("h-6 w-6 grid place-items-center rounded-full text-xs font-bold", done ? "bg-emerald-500 text-white" : current ? "bg-purple-600 text-white" : "bg-slate-200 text-slate-700")}>{s}</span>
+          <li
+            key={label}
+            className={classNames(
+              "flex items-center gap-3 rounded-xl border px-4 py-3",
+              current
+                ? "border-purple-400 bg-purple-50"
+                : done
+                ? "border-emerald-300 bg-emerald-50"
+                : "border-slate-200 bg-white",
+            )}
+          >
+            <span
+              className={classNames(
+                "h-6 w-6 grid place-items-center rounded-full text-xs font-bold",
+                done ? "bg-emerald-500 text-white" : current ? "bg-purple-600 text-white" : "bg-slate-200 text-slate-700",
+              )}
+            >
+              {s}
+            </span>
             <span className={classNames("text-sm font-medium", current ? "text-purple-800" : done ? "text-emerald-700" : "text-slate-600")}>{label}</span>
           </li>
         );
       })}
     </ol>
   );
-}
-
-function prettyType(t: PassengerType) {
-  switch (t) {
-    case "woman":
-      return "Woman";
-    case "pregnant":
-      return "Pregnant woman";
-    case "elderly":
-      return "Elderly passenger";
-    case "luggage":
-      return "Woman with large luggage";
-    case "regular":
-      return "Regular passenger";
-  }
 }
 
 function InfoCard() {
@@ -339,7 +497,9 @@ function PaymentForm({ onPaid, amount }: { onPaid: () => void; amount: number })
   );
 }
 
-function Ticket({ details, seats }: { details: PassengerDetails; seats: string[] }) {
+function Ticket({ booking, seats }: { booking: BookingDetails; seats: string[] }) {
+  // Map seats to passengers by order selected
+  const pairs = booking.passengers.map((p, i) => ({ passenger: p, seat: seats[i] }));
   return (
     <div className="grid gap-4">
       <div className="flex items-center justify-between">
@@ -349,23 +509,27 @@ function Ticket({ details, seats }: { details: PassengerDetails; seats: string[]
         </div>
         <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-600 to-fuchsia-500 grid place-items-center text-white font-extrabold">N</div>
       </div>
-      <div className="grid sm:grid-cols-2 gap-4 text-sm">
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="text-slate-500">Passenger</div>
-          <div className="font-semibold">{details.fullName}</div>
-        </div>
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="text-slate-500">Type</div>
-          <div className="font-semibold">{prettyType(details.type)}</div>
-        </div>
+      <div className="grid gap-3 text-sm">
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="text-slate-500">Route</div>
-          <div className="font-semibold">{details.fromStation} → {details.toStation}</div>
+          <div className="font-semibold">{booking.fromStation} → {booking.toStation}</div>
         </div>
-        <div className="rounded-lg border border-slate-200 p-3">
-          <div className="text-slate-500">Seats</div>
-          <div className="font-semibold">{seats.join(", ")}</div>
-        </div>
+        {pairs.map(({ passenger, seat }, i) => (
+          <div key={i} className="grid sm:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="text-slate-500">Passenger</div>
+              <div className="font-semibold">{passenger.fullName}</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="text-slate-500">Type</div>
+              <div className="font-semibold">{prettyType(passenger.type)}</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3">
+              <div className="text-slate-500">Seat</div>
+              <div className="font-semibold">{seat}</div>
+            </div>
+          </div>
+        ))}
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="text-slate-500">Issued</div>
           <div className="font-semibold">{new Date().toLocaleString()}</div>
@@ -374,4 +538,19 @@ function Ticket({ details, seats }: { details: PassengerDetails; seats: string[]
       <div className="text-xs text-slate-500">Carry a valid ID. Subject to Namma Metro rules and regulations.</div>
     </div>
   );
+}
+
+function prettyType(t: PassengerType) {
+  switch (t) {
+    case "woman":
+      return "Woman";
+    case "pregnant":
+      return "Pregnant woman";
+    case "elderly":
+      return "Elderly passenger";
+    case "luggage":
+      return "Woman with large luggage";
+    case "regular":
+      return "Regular passenger";
+  }
 }
