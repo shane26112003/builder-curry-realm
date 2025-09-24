@@ -8,6 +8,8 @@ interface PassengerDetails {
   fullName: string;
   age: number | "";
   type: PassengerType;
+  fromStation: string;
+  toStation: string;
 }
 
 interface Seat {
@@ -16,15 +18,18 @@ interface Seat {
   col: 0 | 1; // 0 A, 1 B
 }
 
+const STATIONS = ["Baiyappanahalli", "Swami Vivekananda Road", "Indiranagar", "Halasuru", "Trinity", "MG Road", "Cubbon Park", "Vidhana Soudha", "Sir M Visvesvaraya (Central College)", "Kempegowda (Majestic)", "KSR Railway Station", "Magadi Road", "Vijayanagar", "Attiguppe", "Mysuru Road", "Jayanagar", "Yelachenahalli"];
+
 function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
 export default function Reserve() {
   const [step, setStep] = useState(1);
-  const [details, setDetails] = useState<PassengerDetails>({ fullName: "", age: "", type: "woman" });
+  const [details, setDetails] = useState<PassengerDetails>({ fullName: "", age: "", type: "woman", fromStation: "", toStation: "" });
   const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);
+  const routeInvalid = details.fromStation === "" || details.toStation === "" || details.fromStation === details.toStation;
 
   const seats: Seat[] = useMemo(() => {
     const all: Seat[] = [];
@@ -47,7 +52,7 @@ export default function Reserve() {
 
   function next() {
     if (step === 1) {
-      if (!details.fullName || details.age === "" || Number(details.age) <= 0) return;
+      if (!details.fullName || details.age === "" || Number(details.age) <= 0 || routeInvalid) return;
       setStep(2);
     } else if (step === 2) {
       if (!selectedSeat) return;
@@ -111,6 +116,39 @@ export default function Reserve() {
                     </select>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">From</label>
+                    <select
+                      value={details.fromStation}
+                      onChange={(e) => setDetails((d) => ({ ...d, fromStation: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Select origin</option>
+                      {STATIONS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700">Destination</label>
+                    <select
+                      value={details.toStation}
+                      onChange={(e) => setDetails((d) => ({ ...d, toStation: e.target.value }))}
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">Select destination</option>
+                      {STATIONS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {routeInvalid && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+                    Please select both stations, and ensure they are different.
+                  </div>
+                )}
                 <div className="text-sm text-slate-500">
                   Note: This coach is reserved for women, pregnant women, elderly passengers, and women carrying large luggage.
                 </div>
@@ -159,6 +197,8 @@ export default function Reserve() {
               <h3 className="font-semibold">Selection</h3>
               <p className="text-sm text-slate-600 mt-2">Passenger: {details.fullName || "—"}</p>
               <p className="text-sm text-slate-600">Type: {prettyType(details.type)}</p>
+              <p className="text-sm text-slate-600">From: {details.fromStation || "—"}</p>
+              <p className="text-sm text-slate-600">To: {details.toStation || "—"}</p>
               <p className="text-sm text-slate-600">Seat: {selectedSeat || "—"}</p>
             </div>
           </section>
@@ -180,6 +220,8 @@ export default function Reserve() {
                 <li>Name: {details.fullName}</li>
                 <li>Age: {details.age}</li>
                 <li>Type: {prettyType(details.type)}</li>
+                <li>From: {details.fromStation}</li>
+                <li>Destination: {details.toStation}</li>
                 <li>Seat: {selectedSeat}</li>
               </ul>
             </div>
@@ -301,6 +343,10 @@ function Ticket({ details, seat }: { details: PassengerDetails; seat: string }) 
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="text-slate-500">Type</div>
           <div className="font-semibold">{prettyType(details.type)}</div>
+        </div>
+        <div className="rounded-lg border border-slate-200 p-3">
+          <div className="text-slate-500">Route</div>
+          <div className="font-semibold">{details.fromStation} → {details.toStation}</div>
         </div>
         <div className="rounded-lg border border-slate-200 p-3">
           <div className="text-slate-500">Seat</div>
