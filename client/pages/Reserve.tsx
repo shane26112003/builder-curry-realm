@@ -299,8 +299,8 @@ function InfoCard() {
     <div className="bg-white/80 border border-purple-100 rounded-2xl p-6 h-fit">
       <h3 className="font-semibold">Coach rules</h3>
       <ul className="mt-2 text-sm text-slate-600 space-y-1 list-disc pl-5">
-        <li>Reserved for women, pregnant women, elderly passengers, and women carrying large luggage.</li>
-        <li>One seat per passenger. Keep your ticket accessible during the journey.</li>
+        <li>Priority for women, pregnant women, elderly passengers, and women carrying large luggage. Regular passengers are also permitted.</li>
+        <li>One seat per passenger per selection. Keep your ticket accessible during the journey.</li>
         <li>Please offer assistance to those in need and maintain decorum.</li>
       </ul>
     </div>
